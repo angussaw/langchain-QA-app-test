@@ -1,0 +1,17 @@
+DB_CHROMA_PATH: 'chroma_db'
+HUGGING_FACE_EMBEDDING_MODEL: "sentence-transformers/all-mpnet-base-v2"
+OPENAI_MODEL: 'gpt-3.5-turbo'
+
+streamlit:
+  LAST_N_RESPONSES: 3
+  TOOLTIPS:
+    chunk_size: "Maximum number of characters that a chunk can contain"
+    chunk_overlap: "Number of characters that should overlap between two adjacent chunks"
+    collection_name: "A short title of the article that acts as a unique identifier for each Chroma vector database of a PDF file. \n \
+                          Refer to https://docs.trychroma.com/usage-guide#creating-inspecting-and-deleting-collections \
+                          for restrictions on Chroma collection names"
+    description: "A short description of the article and its contents. Recommended to include what the article is useful for."
+    temperature: "A scaling factor that is applied within the final softmax layer that influences the shape \
+                      of the probability distribution that the model calculates for the next token. \n \
+                      The higher the value, the greater the randomness (vice versa)"
+    select_k_documents: "Number of chunks to be selected as context in the prompt to the LLM"
