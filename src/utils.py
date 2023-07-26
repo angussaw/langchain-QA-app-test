@@ -178,8 +178,7 @@ def initialize_conversational_react_agent(tool_names: list, tool_descriptions: l
 
         tool = Tool(name=tool_names[i],
                     func=chains[i].run,
-                    description=tool_descriptions[i],
-                    return_direct=True)
+                    description=tool_descriptions[i])
         
         tools.append(tool)
 
