@@ -7,6 +7,7 @@ import src.utils as backend
 from st_aggrid import AgGrid, GridOptionsBuilder
 import streamlit as st
 import streamlit_chat
+import wandb
 import yaml
 
 # Import config vars
@@ -63,8 +64,9 @@ def main():
         - Converting smaller chunks of text to vector embeddings and storing them in local vector databases 
         - Managing of PDF files that are loaded and ready to be queried
         - Setting up of conversation agent by specifying genative configuration
+        - Initializing run on a Weights & Biases project to log agent execution chains and responses for refrence and evaluation
         - Chat with multiple PDF files at once via an agent fetching the correct documents based on question
-        - Saving chat history for refrence and evaluation
+        - Saving chat history as csv files
     """
 
     hide_default_format = """
@@ -90,7 +92,8 @@ def main():
     st.header("Converse with your PDFs!")
     st.caption("1. Upload a new PDF file with a specified article name and its description")
     st.caption("2. Select document(s) to converse with and enter OpenAI API key along with response parameters to generate conversation agent")
-    st.caption("3. Converse with your document(s) by entering your question!")
+    st.caption("3. Enter Weights & Biases project name and API key to log agent execution chains and responses for LLM evaluation")
+    st.caption("4. Converse with your document(s) by entering your question!")
     st.divider()
 
     ##########################################
@@ -105,6 +108,8 @@ def main():
         st.session_state['agent'] = None
     if 'docs_selected' not in st.session_state:
         st.session_state['docs_selected'] = []
+    if 'run' not in st.session_state:
+        st.session_state['run'] = None
 
     existing_chroma_paths = [f.path for f in os.scandir("chroma_db") if f.is_dir()]
     if len(existing_chroma_paths) == 0:
@@ -188,8 +193,11 @@ def main():
                 st.session_state["agent"] = None
                 st.session_state['generated'] = []
                 st.session_state['past'] = []
+                if st.session_state['run']:
+                    wandb.finish()
+                st.session_state['run'] = None
 
-            agent_tab, conv_tab = st.tabs(["Agent settings", "Chat conversation"])
+            agent_tab, eval_tab, conv_tab = st.tabs(["Agent settings", "Logging settings", "Chat conversation"])
 
             ################################################
             ###### Setting up chat conversation agent ######
@@ -236,6 +244,38 @@ def main():
                         st.session_state['agent'] = agent
                         st.experimental_rerun()
 
+            #######################################################
+            ###### Evaluating responses using Weights&Biases ######
+            #######################################################
+
+            with eval_tab:
+                col1, col2 = st.columns([10, 8], gap="large")
+                with col1:
+                    st.caption("Log responses onto Weights & Biases project by inputting API key and project name:")
+                    wandb_api_key = st.text_input('Weights & Biases API key', type='password')
+                    wandb_project_name = st.text_input('Weights & Biases project name', 'langchain_qa_app')
+                    with st.form(key='my_form_3', clear_on_submit=True):
+                        wandb_init= st.form_submit_button('Initialize Weights & Biases run', disabled=not(wandb_api_key and \
+                                                                                                            wandb_project_name \
+                                                                                                            and st.session_state['agent'] \
+                                                                                                            and not st.session_state["run"]))
+                        
+                with col2:
+                    wandb_run_container = st.container()
+                    with wandb_run_container:
+                        if st.session_state['run']:
+                            st.write("Responses are logged to Weights & Biases project.")
+                            st.divider()
+                            st.write("Chat with selected document(s) in the conversation tab!")
+                            
+                if wandb_init and not st.session_state['run']:
+                    with st.spinner('Creating Weights & Biases run...'):
+                        wandb.login(key=wandb_api_key)
+                        st.session_state['run'] =  wandb.init(project=wandb_project_name, job_type="generation")
+                        os.environ["LANGCHAIN_WANDB_TRACING"] = "true"
+                        st.experimental_rerun()
+
+
             #####################################################################
             ###### Displaying chat history and input area to ask questions ######
             #####################################################################
@@ -254,7 +294,8 @@ def main():
 
                 if submitted_query:
                     
-                    output = st.session_state['agent']({"input":query_text})["output"]
+                    # output = st.session_state['agent']({"input":query_text})["output"]
+                    output = st.session_state['agent'].run(query_text)
                     st.session_state['generated'].append(output)
                     st.session_state['past'].append(query_text)
 
@@ -287,6 +328,9 @@ def main():
             st.session_state['generated'] = []
             st.session_state['past'] = []
             st.session_state['agent'] = None
+            if st.session_state['run']:
+                wandb.finish()
+            st.session_state['run'] = None
             
 
 
